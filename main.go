@@ -8,7 +8,6 @@ import (
 	"log"
 	"strings"
 
-	_ "github.com/golang/protobuf/ptypes/struct"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
@@ -45,6 +44,20 @@ var (
 	ceJSON = flag.String("ce", defaultCE, "CloudEvent as JSON")
 )
 
+func dynamicValue(i interface{}) ref.Val {
+	// Terrible hack to get dynamic values. Consider making the API calls
+	// directly instead.
+	b, err := json.Marshal(i)
+	if err != nil {
+		return types.NewErr(err.Error())
+	}
+	var s map[string]interface{}
+	if err := json.Unmarshal(b, &s); err != nil {
+		return types.NewErr(err.Error())
+	}
+	return types.DefaultTypeAdapter.NativeToValue(s)
+}
+
 func main() {
 	flag.Parse()
 	ctx := context.Background()
@@ -58,6 +71,12 @@ func main() {
 			decls.NewFunction("commit",
 				decls.NewOverload("commit",
 					[]*exprpb.Type{decls.String, decls.String, decls.String},
+					decls.Dyn,
+				),
+			),
+			decls.NewFunction("pr",
+				decls.NewOverload("pr",
+					[]*exprpb.Type{decls.String, decls.String, decls.Int},
 					decls.Dyn,
 				),
 			),
@@ -109,18 +128,23 @@ func main() {
 				if err != nil {
 					return types.NewErr(err.Error())
 				}
-
-				// Terrible hack to get dynamic values. Consider making the API calls
-				// directly instead.
-				b, err := json.Marshal(c)
+				return dynamicValue(c)
+			},
+		},
+		&functions.Overload{
+			Operator: "pr",
+			Function: func(values ...ref.Val) ref.Val {
+				if len(values) != 3 {
+					return types.NewErr("invalid args")
+				}
+				owner := values[0].Value().(string)
+				repo := values[1].Value().(string)
+				pr := values[2].Value().(int64)
+				c, _, err := gh.PullRequests.Get(ctx, owner, repo, int(pr))
 				if err != nil {
 					return types.NewErr(err.Error())
 				}
-				var s map[string]interface{}
-				if err := json.Unmarshal(b, &s); err != nil {
-					return types.NewErr(err.Error())
-				}
-				return types.DefaultTypeAdapter.NativeToValue(s)
+				return dynamicValue(c)
 			},
 		},
 		&functions.Overload{
