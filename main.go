@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
+	_ "github.com/golang/protobuf/ptypes/struct"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
@@ -56,7 +58,7 @@ func main() {
 			decls.NewFunction("commit",
 				decls.NewOverload("commit",
 					[]*exprpb.Type{decls.String, decls.String, decls.String},
-					decls.String,
+					decls.Dyn,
 				),
 			),
 		),
@@ -101,7 +103,18 @@ func main() {
 				if err != nil {
 					return types.NewErr(err.Error())
 				}
-				return types.String(c.GetCommit().GetMessage())
+
+				// Terrible hack to get dynamic values. Consider making the API calls
+				// directly instead.
+				b, err := json.Marshal(c)
+				if err != nil {
+					return types.NewErr(err.Error())
+				}
+				var s map[string]interface{}
+				if err := json.Unmarshal(b, &s); err != nil {
+					return types.NewErr(err.Error())
+				}
+				return types.DefaultTypeAdapter.NativeToValue(s)
 			},
 		},
 	)
@@ -125,5 +138,6 @@ func main() {
 		log.Fatalf("runtime error: %s\n", err)
 	}
 
+	fmt.Println(strings.Repeat("=", 40))
 	fmt.Printf("out: %#v\n", out)
 }
