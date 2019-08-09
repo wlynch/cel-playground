@@ -61,6 +61,12 @@ func main() {
 					decls.Dyn,
 				),
 			),
+			decls.NewFunction("collaborator",
+				decls.NewOverload("collaborator",
+					[]*exprpb.Type{decls.String, decls.String, decls.String},
+					decls.Bool,
+				),
+			),
 		),
 	)
 	if err != nil {
@@ -115,6 +121,22 @@ func main() {
 					return types.NewErr(err.Error())
 				}
 				return types.DefaultTypeAdapter.NativeToValue(s)
+			},
+		},
+		&functions.Overload{
+			Operator: "collaborator",
+			Function: func(values ...ref.Val) ref.Val {
+				if len(values) != 3 {
+					return types.NewErr("invalid args")
+				}
+				owner := values[0].Value().(string)
+				repo := values[1].Value().(string)
+				user := values[2].Value().(string)
+				c, _, err := gh.Repositories.IsCollaborator(ctx, owner, repo, user)
+				if err != nil {
+					return types.NewErr(err.Error())
+				}
+				return types.Bool(c)
 			},
 		},
 	)
