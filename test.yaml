@@ -1,0 +1,2 @@
+args: '{{"Hello " + ce.owner}}'
+base_repo: '{{pr(ce.owner, ce.repo, 1).base.repo.html_url}}'
