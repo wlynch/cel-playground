@@ -1,2 +1,5 @@
-args: '{{"Hello " + ce.owner}}'
-base_repo: '{{pr(ce.owner, ce.repo, 1).base.repo.html_url}}'
+const: 'asdf'
+var: '$(ce.owner)'
+concat: '$("Hello " + cat)'
+func: '$(pr(ce.owner, ce.repo, 1).base.repo.html_url)'
+cond: '$(pr(ce.owner, ce.repo, 1).base.ref == "master" ? "is master" : "not master")'

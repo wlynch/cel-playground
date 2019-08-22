@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/google/cel-go/cel"
@@ -143,6 +144,7 @@ func main() {
 					decls.Bool,
 				),
 			),
+			decls.NewIdent("cat", decls.String, nil),
 		),
 	)
 	if err != nil {
@@ -153,15 +155,18 @@ func main() {
 	if err := yaml.Unmarshal([]byte(*expr), &d); err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(d)
+	log.Println("in: ", d)
 
 	for k, _ := range d {
 		s, ok := d[k].(string)
 		if !ok {
 			continue
 		}
-		s = strings.TrimPrefix(s, "{{")
-		s = strings.TrimSuffix(s, "}}")
+		if ok, err := regexp.Match(`\$\(.*\)`, []byte(s)); !ok || err != nil {
+			continue
+		}
+		s = strings.TrimPrefix(s, "$(")
+		s = strings.TrimSuffix(s, ")")
 		// Parse and check the expression.
 		p, iss := e.Parse(s)
 		if iss != nil && iss.Err() != nil {
@@ -179,7 +184,8 @@ func main() {
 		// Evaluate the program against some inputs. Note: the details return is not used.
 		out, _, err := prg.Eval(map[string]interface{}{
 			// Native values are converted to CEL values under the covers.
-			"ce": cloudEvent,
+			"ce":  cloudEvent,
+			"cat": "🐱",
 		})
 		if err != nil {
 			log.Fatalf("runtime error: %s\n", err)
@@ -187,5 +193,5 @@ func main() {
 
 		d[k] = out.Value()
 	}
-	log.Println(d)
+	log.Println("out: ", d)
 }
